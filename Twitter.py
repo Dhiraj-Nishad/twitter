@@ -1,6 +1,7 @@
 import re
+import asyncio
 import tweepy
-from telethon import TelegramClient, events
+from telethon import TelegramClient
 
 # Replace these with your credentials
 API_ID = 29199461
@@ -20,34 +21,27 @@ TARGET_TWITTER_USERS = ['godofhell__']  # Add the new Twitter user here
 
 client = TelegramClient(SESSION_NAME, API_ID, API_HASH)
 
-# Set up Twitter API client
-auth = tweepy.OAuthHandler(TWITTER_API_KEY, TWITTER_API_SECRET)
-auth.set_access_token(TWITTER_ACCESS_TOKEN, TWITTER_ACCESS_TOKEN_SECRET)
-twitter_api = tweepy.API(auth)
-
-# Function to forward tweets to Telegram
-class MyStream(tweepy.Stream):
-    def on_status(self, status):
-        if status.user.screen_name in TARGET_TWITTER_USERS:
-            message_text = status.text
-            client.send_message(TROJAN_BOT_ID, message_text)
+class MyStream(tweepy.AsyncStreamingClient):
+    async def on_tweet(self, tweet):
+        if tweet.author.username in TARGET_TWITTER_USERS:
+            message_text = tweet.text
+            await client.send_message(TROJAN_BOT_ID, message_text)
             print(f"Forwarded tweet to Telegram: {message_text}")
 
-    def on_error(self, status_code):
+    async def on_error(self, status_code):
         if status_code == 420:
             return False  # Disconnects the stream on rate limiting
 
-# Start streaming tweets from the specified users
-def start_stream():
-    my_stream = MyStream(auth=twitter_api.auth)
-    my_stream.filter(follow=[str(twitter_api.get_user(user).id) for user in TARGET_TWITTER_USERS])
+async def start_stream():
+    my_stream = MyStream(TWITTER_API_KEY, TWITTER_API_SECRET, TWITTER_ACCESS_TOKEN, TWITTER_ACCESS_TOKEN_SECRET)
+    await my_stream.add_rules(tweepy.StreamRule(" OR ".join(f"from:{user}" for user in TARGET_TWITTER_USERS)))
+    await my_stream.filter()
 
-def main():
+async def main():
     print("Starting the Telegram client...")
-    with client:
-        print("Listening for new messages...")
-        start_stream()
-        client.run_until_disconnected()
+    await client.start()
+    print("Listening for new messages...")
+    await start_stream()
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
