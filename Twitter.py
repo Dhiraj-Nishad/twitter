@@ -16,7 +16,7 @@ TWITTER_ACCESS_TOKEN_SECRET = 'C3ReRKNxZjsAI9HghxyyiMWpYLp9dW5wtP8Jl48hnQmab'
 # List of source group IDs
 SOURCE_GROUP_IDS = ['@buybotttttt', '@buybottttt']  # Add more groups as needed
 TROJAN_BOT_ID = '@bonkbot_bot'
-TARGET_TWITTER_USER = 'godofhell__'  # Replace with the Twitter username
+TARGET_TWITTER_USERS = ['godofhell__']  # Add the new Twitter user here
 
 client = TelegramClient(SESSION_NAME, API_ID, API_HASH)
 
@@ -26,18 +26,21 @@ auth.set_access_token(TWITTER_ACCESS_TOKEN, TWITTER_ACCESS_TOKEN_SECRET)
 twitter_api = tweepy.API(auth)
 
 # Function to forward tweets to Telegram
-class MyStreamListener(tweepy.StreamListener):
+class MyStream(tweepy.Stream):
     def on_status(self, status):
-        if status.user.screen_name == TARGET_TWITTER_USER:
+        if status.user.screen_name in TARGET_TWITTER_USERS:
             message_text = status.text
             client.send_message(TROJAN_BOT_ID, message_text)
             print(f"Forwarded tweet to Telegram: {message_text}")
 
-# Start streaming tweets from the specified user
+    def on_error(self, status_code):
+        if status_code == 420:
+            return False  # Disconnects the stream on rate limiting
+
+# Start streaming tweets from the specified users
 def start_stream():
-    listener = MyStreamListener()
-    stream = tweepy.Stream(auth=twitter_api.auth, listener=listener)
-    stream.filter(follow=[str(twitter_api.get_user(TARGET_TWITTER_USER).id)])
+    my_stream = MyStream(auth=twitter_api.auth)
+    my_stream.filter(follow=[str(twitter_api.get_user(user).id) for user in TARGET_TWITTER_USERS])
 
 def main():
     print("Starting the Telegram client...")
